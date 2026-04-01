@@ -92,6 +92,7 @@ def generate_po():
             },
             "item_description": data["item_description"],
             "amount": float(data["amount"]),
+            "currency": data.get("currency", "CZK"),
         }
 
         # Generate PDF
@@ -100,7 +101,7 @@ def generate_po():
         merge_with_letterhead(content_buf, LETTERHEAD_PATH, output_buf)
         output_buf.seek(0)
 
-        filename = f"{po_data['po_number']}.pdf"
+        filename = f"{po_data['po_number']} {po_data['supplier']['name']}.pdf"
         return send_file(
             output_buf,
             mimetype="application/pdf",

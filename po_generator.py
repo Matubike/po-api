@@ -44,11 +44,27 @@ MID     = colors.HexColor("#666B7A")
 WHITE   = colors.white
 DIVIDER = colors.HexColor("#D0D5E0")
 
-def format_czk(amount):
+CURRENCY_SYMBOLS = {
+    "CZK": "Kč",
+    "SEK": "kr",
+    "EUR": "€",
+    "NOK": "kr",
+    "DKK": "kr",
+    "CHF": "CHF",
+}
+
+def format_amount(amount, currency="CZK"):
     integer_part = int(amount)
     decimal_part = round((amount - integer_part) * 100)
     int_str = f"{integer_part:,}".replace(",", "\u00a0")
-    return f"{int_str},{decimal_part:02d} Kč"
+    symbol = CURRENCY_SYMBOLS.get(currency, currency)
+    # EUR symbol goes before the number
+    if currency == "EUR":
+        return f"{symbol} {int_str},{decimal_part:02d}"
+    elif currency == "CHF":
+        return f"CHF {int_str},{decimal_part:02d}"
+    else:
+        return f"{int_str},{decimal_part:02d} {symbol}"
 
 def s(name, **kw):
     return ParagraphStyle(name, fontName=kw.get("font", F), fontSize=kw.get("size", 9),
@@ -147,7 +163,8 @@ def generate_po_content(po_data):
         return Paragraph(txt, s("td", font=FB if bold else F, size=size, color=color, align=align, leading=13))
 
     amt = po_data["amount"]
-    amt_str = format_czk(amt)
+    currency = po_data.get("currency", "CZK")
+    amt_str = format_amount(amt, currency)
 
     rows = [
         [hdr("Položka"), hdr("Množství", TA_CENTER), hdr("Jednotková cena", TA_RIGHT), hdr("Celkem", TA_RIGHT)],
