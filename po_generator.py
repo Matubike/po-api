@@ -12,11 +12,15 @@ import io, os
 
 # ── Fonts ──────────────────────────────────────────────────────────────────────
 FONT_PATHS = [
+    os.environ.get("DEJAVU_FONT_PATH", ""),
+    "/tmp/fonts/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf",
 ]
 FONT_BOLD_PATHS = [
+    os.environ.get("DEJAVU_FONT_BOLD_PATH", ""),
+    "/tmp/fonts/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf",

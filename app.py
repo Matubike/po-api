@@ -3,6 +3,33 @@ from flask_cors import CORS
 import io
 import sys
 import os
+import urllib.request
+
+# ── Download DejaVu fonts if not present ──────────────────────────────────────
+FONT_DIR = "/tmp/fonts"
+FONT_URL = "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2"
+
+def ensure_fonts():
+    font_path = "/tmp/fonts/DejaVuSans.ttf"
+    if not os.path.exists(font_path):
+        os.makedirs(FONT_DIR, exist_ok=True)
+        print("Downloading DejaVu fonts...")
+        import tarfile
+        tmp_tar = "/tmp/dejavu.tar.bz2"
+        urllib.request.urlretrieve(FONT_URL, tmp_tar)
+        with tarfile.open(tmp_tar, "r:bz2") as tar:
+            for member in tar.getmembers():
+                if member.name.endswith(".ttf") and "ttf/" in member.name:
+                    member.name = os.path.basename(member.name)
+                    tar.extract(member, FONT_DIR)
+        print(f"Fonts ready: {os.listdir(FONT_DIR)}")
+    return font_path
+
+ensure_fonts()
+
+# Set font paths for po_generator
+os.environ["DEJAVU_FONT_PATH"] = "/tmp/fonts/DejaVuSans.ttf"
+os.environ["DEJAVU_FONT_BOLD_PATH"] = "/tmp/fonts/DejaVuSans-Bold.ttf"
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(__file__))
