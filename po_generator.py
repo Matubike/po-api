@@ -13,17 +13,17 @@ import io, os
 # ── Fonts ──────────────────────────────────────────────────────────────────────
 FONT_PATHS = [
     os.environ.get("DEJAVU_FONT_PATH", ""),
+    "/tmp/fonts/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
     "/tmp/fonts/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf",
 ]
 FONT_BOLD_PATHS = [
     os.environ.get("DEJAVU_FONT_BOLD_PATH", ""),
+    "/tmp/fonts/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "/tmp/fonts/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans-Bold.ttf",
 ]
 font_path = next((p for p in FONT_PATHS if os.path.exists(p)), None)
 font_bold_path = next((p for p in FONT_BOLD_PATHS if os.path.exists(p)), None)

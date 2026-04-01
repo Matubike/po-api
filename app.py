@@ -10,16 +10,24 @@ FONT_DIR = "/tmp/fonts"
 FONT_URL = "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.tar.bz2"
 
 def ensure_fonts():
-    font_path = "/tmp/fonts/DejaVuSans.ttf"
+    font_path = "/tmp/fonts/LiberationSans-Regular.ttf"
+    # First check if Liberation Sans is already on the system
+    system_path = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    if os.path.exists(system_path):
+        print("Using system Liberation Sans fonts")
+        return system_path
     if not os.path.exists(font_path):
         os.makedirs(FONT_DIR, exist_ok=True)
-        print("Downloading DejaVu fonts...")
+        print("Downloading Liberation fonts...")
         import tarfile
-        tmp_tar = "/tmp/dejavu.tar.bz2"
-        urllib.request.urlretrieve(FONT_URL, tmp_tar)
-        with tarfile.open(tmp_tar, "r:bz2") as tar:
+        tmp_tar = "/tmp/liberation.tar.gz"
+        urllib.request.urlretrieve(
+            "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz",
+            tmp_tar
+        )
+        with tarfile.open(tmp_tar, "r:gz") as tar:
             for member in tar.getmembers():
-                if member.name.endswith(".ttf") and "ttf/" in member.name:
+                if member.name.endswith(".ttf"):
                     member.name = os.path.basename(member.name)
                     tar.extract(member, FONT_DIR)
         print(f"Fonts ready: {os.listdir(FONT_DIR)}")
