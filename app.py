@@ -193,34 +193,7 @@ def generate_quote():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# app.py — co přidat
 
-## ÚPRAVA 1: Import
-
-Pod existující řádek:
-```python
-from quote_generator import generate_quote_content
-```
-
-PŘIDEJ:
-```python
-from line_items_generator import generate_line_items_content
-```
-
----
-
-## ÚPRAVA 2: Nový endpoint /generate-line-items
-
-PŘED tenhle blok na konci app.py:
-```python
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    app.run(host="0.0.0.0", port=port)
-```
-
-PŘIDEJ tenhle endpoint:
-
-```python
 @app.route("/generate-line-items", methods=["POST"])
 def generate_line_items():
     try:
