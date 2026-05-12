@@ -1,16 +1,15 @@
 """
 Mapecomm cenové nabídky (Price Quotations) — PDF generator.
 Renders the quote body and overlays it on the same letterhead.pdf used for POs.
-Visually mirrors po_generator.py (gradient title band, info blocks, items table,
-legal text, signature blocks), with these differences:
+Visually mirrors po_generator.py with these differences:
   - Title: "CENOVÁ NABÍDKA" (not "OBJEDNÁVKA")
-  - Number format: "Q-26-0001" (not "OBJ-26-0034")
+  - Number format: "Q-26-0001" (frontend supplies)
   - Dodavatel / Odběratel are REVERSED (Mapecomm = Dodavatel, customer = Odběratel)
-  - Multi-currency: CZK / EUR / SEK / DKK / NOK
-  - Multi-item table (PO has 1 item, quote can have many; also supports hourly + fixed modes)
-  - Legal text is quote-specific (validity, non-binding offer, scope-change reservation)
+  - Multi-item table (PO has 1 item; quote can have many)
+  - Legal text is quote-specific (validity, non-binding offer, scope-change)
   - Optional "Valid until" line below total
   - Optional notes block below legal text
+Font and currency logic is intentionally identical to po_generator.py.
 """
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -22,69 +21,71 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import io, os
 
-# ── Fonts (same logic as po_generator) ────────────────────────────────────────
+# ── Fonts (identical search order to po_generator.py) ─────────────────────────
 FONT_PATHS = [
+    os.environ.get("DEJAVU_FONT_PATH", ""),
+    "/tmp/fonts/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/tmp/fonts/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
 ]
 FONT_BOLD_PATHS = [
+    os.environ.get("DEJAVU_FONT_BOLD_PATH", ""),
+    "/tmp/fonts/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/tmp/fonts/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
 ]
 font_path = next((p for p in FONT_PATHS if os.path.exists(p)), None)
 font_bold_path = next((p for p in FONT_BOLD_PATHS if os.path.exists(p)), None)
 if font_path:
-    # Re-register only if not already registered (po_generator may have done it)
     try:
         pdfmetrics.registerFont(TTFont("DejaVu", font_path))
         pdfmetrics.registerFont(TTFont("DejaVu-Bold", font_bold_path))
     except Exception:
-        pass
+        pass  # already registered by po_generator on the same Python process
     F = "DejaVu"
     FB = "DejaVu-Bold"
 else:
     F = "Helvetica"
     FB = "Helvetica-Bold"
 
-# ── Mapecomm brand colors (matching po_generator) ─────────────────────────────
+# ── Colors (identical to po_generator) ────────────────────────────────────────
 BLUE    = colors.HexColor("#2E7EC7")
 DARK    = colors.HexColor("#3D4555")
 LGRAY   = colors.HexColor("#F4F6F9")
 LGRAY2  = colors.HexColor("#EDF1F7")
 MID     = colors.HexColor("#666B7A")
-LIGHT_TXT = colors.HexColor("#999999")
 WHITE   = colors.white
 DIVIDER = colors.HexColor("#D0D5E0")
 
-# ── Currency formatting ──────────────────────────────────────────────────────
+# ── Currency formatting (identical to po_generator) ───────────────────────────
 CURRENCY_SYMBOLS = {
     "CZK": "Kč",
-    "EUR": "€",
     "SEK": "kr",
-    "DKK": "kr",
+    "EUR": "€",
     "NOK": "kr",
+    "DKK": "kr",
+    "CHF": "CHF",
 }
 
 def format_amount(amount, currency="CZK"):
-    """Czech-style number formatting: '1\u00a0250,00 Kč'."""
-    symbol = CURRENCY_SYMBOLS.get(currency, currency)
     integer_part = int(amount)
     decimal_part = round((amount - integer_part) * 100)
     int_str = f"{integer_part:,}".replace(",", "\u00a0")
-    return f"{int_str},{decimal_part:02d} {symbol}"
+    symbol = CURRENCY_SYMBOLS.get(currency, currency)
+    if currency == "EUR":
+        return f"{symbol} {int_str},{decimal_part:02d}"
+    elif currency == "CHF":
+        return f"CHF {int_str},{decimal_part:02d}"
+    else:
+        return f"{int_str},{decimal_part:02d} {symbol}"
 
-# ── Paragraph style helper ────────────────────────────────────────────────────
 def s(name, **kw):
-    return ParagraphStyle(
-        name,
-        fontName=kw.get("font", F),
-        fontSize=kw.get("size", 9),
-        textColor=kw.get("color", DARK),
-        leading=kw.get("leading", 13),
-        alignment=kw.get("align", TA_LEFT),
-        spaceBefore=kw.get("sb", 0),
-        spaceAfter=kw.get("sa", 0),
-    )
+    return ParagraphStyle(name, fontName=kw.get("font", F), fontSize=kw.get("size", 9),
+        textColor=kw.get("color", DARK), leading=kw.get("leading", 13),
+        alignment=kw.get("align", TA_LEFT), spaceBefore=kw.get("sb", 0),
+        spaceAfter=kw.get("sa", 0))
 
 # ── Legal text (CZK uses Czech, others use English) ───────────────────────────
 LEGAL_CZ = (
@@ -114,52 +115,6 @@ LEGAL_EN = (
 def generate_quote_content(quote_data):
     """
     Generate the quote content as a PDF buffer (no letterhead — that's merged separately).
-
-    Expected quote_data shape:
-    {
-        "quote_number": "Q-26-0001",
-        "issue_date": "12.5.2026",
-        "valid_until": "30.6.2026",                       # optional, can be empty/None
-        "currency": "CZK",                                 # CZK | EUR | SEK | DKK | NOK
-        "description": "Optional intro paragraph...",     # optional
-        "notes": "Optional case-specific notes...",       # optional, shown below legal text
-        "supplier": {                                      # = Mapecomm
-            "name": "Mapecomm s.r.o.",
-            "ico": "10950672",
-            "dic": "CZ10950672",
-            "address": "U Stavoservisu 659/3",
-            "city_zip": "10800 Praha",
-            "country": "Česká republika",
-            "contact": "Jakub Matuska",
-            "email": "jakub@mapecomm.tech",
-            "phone": "+420 724 941 971",
-        },
-        "buyer": {                                         # = customer (existing or prospect)
-            "name": "Green24 Holding, a.s.",
-            "ico": "...",                                  # optional
-            "dic": "...",                                  # optional
-            "address": "...",                              # optional
-            "city_zip": "...",                             # optional
-            "country": "...",                              # optional
-            "contact": "...",                              # optional
-            "email": "...",                                # optional
-            "phone": "...",                                # optional
-        },
-        "pricing_mode": "per_item",                        # per_item | hourly | fixed
-        "items": [                                         # one or more rows (always provided; for hourly/fixed
-                                                            #   the API server constructs a single-row list)
-            {
-                "name": "Servisní práce - demontáž nabíječek",
-                "description": "Optional second-line description",  # optional
-                "quantity": 1,
-                "unit": "ks",                              # optional ('ks' | 'h' | 'site' | 'km' | free text)
-                "unit_price": 22675.0,
-                "line_total": 22675.0,
-            },
-            ...
-        ],
-        "total": 22675.0,                                  # grand total (also = sum of line_totals)
-    }
     """
     buf = io.BytesIO()
     W, H = A4
@@ -277,14 +232,12 @@ def generate_quote_content(quote_data):
 
     items = quote_data.get("items", [])
     for it in items:
-        # Item name + optional description as 2nd line
         name = it.get("name", "")
         if it.get("description"):
             item_html = f'{name}<br/><font size="8" color="#888888">{it["description"]}</font>'
         else:
             item_html = name
         qty_val = it.get("quantity", 1)
-        # Quantity formatting: integer if whole number, else 2 decimals
         if isinstance(qty_val, (int, float)) and qty_val == int(qty_val):
             qty_str = str(int(qty_val))
         else:
@@ -300,7 +253,6 @@ def generate_quote_content(quote_data):
             cel(line_total_str, align=TA_RIGHT),
         ])
 
-    # Grand total row
     total_str = format_amount(quote_data.get("total", 0), currency)
     rows.append([
         cel("CENA CELKEM bez DPH", bold=True, size=10),
@@ -310,9 +262,7 @@ def generate_quote_content(quote_data):
 
     tbl = Table(rows, colWidths=col_widths, repeatRows=1)
 
-    # Build style dynamically: header + items + total
     style_cmds = [
-        # Header row
         ("BACKGROUND", (0,0), (-1,0), BLUE),
         ("TOPPADDING",    (0,0), (-1,0), 3*mm),
         ("BOTTOMPADDING", (0,0), (-1,0), 3*mm),
@@ -330,7 +280,6 @@ def generate_quote_content(quote_data):
             ("RIGHTPADDING",  (0,i), (-1,i), 4*mm),
             ("LINEBELOW", (0,i), (-1,i), 0.5, DIVIDER),
         ])
-    # Total row
     total_row_idx = n_items + 1
     style_cmds.extend([
         ("BACKGROUND", (0,total_row_idx), (-1,total_row_idx), LGRAY),
