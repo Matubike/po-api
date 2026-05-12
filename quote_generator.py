@@ -212,12 +212,11 @@ def generate_quote_content(quote_data):
         story.append(Spacer(1, 3*mm))
 
     # ── ITEMS TABLE ───────────────────────────────────────────────────────────
-    # 5 columns: Položka | Množ. | Jedn. | Jednotková cena | Celkem
-    # (short headers prevent the qty/unit columns from wrapping on 2 lines)
-    col_widths = [CW*0.36, CW*0.12, CW*0.12, CW*0.18, CW*0.22]
+    # 5 columns: Položka | Množ. | Jedn. | Cena za jedn. | Celkem
+    col_widths = [CW*0.34, CW*0.13, CW*0.13, CW*0.20, CW*0.20]
 
     def hdr(txt, align=TA_LEFT):
-        return Paragraph(txt, s("th", font=FB, size=9, color=WHITE, align=align))
+        return Paragraph(txt, s("th", font=FB, size=8.5, color=WHITE, align=align, leading=11))
 
     def cel(txt, bold=False, align=TA_LEFT, color=DARK, size=9):
         return Paragraph(txt, s("td", font=FB if bold else F, size=size,
@@ -227,7 +226,7 @@ def generate_quote_content(quote_data):
         hdr("Položka"),
         hdr("Množství", TA_CENTER),
         hdr("Jednotka", TA_CENTER),
-        hdr("Jednotková cena", TA_RIGHT),
+        hdr("Cena za jedn.", TA_RIGHT),
         hdr("Celkem", TA_RIGHT),
     ]]
 
