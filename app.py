@@ -43,6 +43,7 @@ os.environ["DEJAVU_FONT_BOLD_PATH"] = "/tmp/fonts/DejaVuSans-Bold.ttf"
 sys.path.insert(0, os.path.dirname(__file__))
 
 from po_generator import generate_po_content, merge_with_letterhead
+from quote_generator import generate_quote_content
 
 app = Flask(__name__)
 CORS(app)
@@ -111,7 +112,86 @@ def generate_po():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route("/generate-quote", methods=["POST"])
+def generate_quote():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
 
+        # Validate required fields
+        required = ["quote_number", "issue_date", "buyer", "items", "total", "currency"]
+        for field in required:
+            if field not in data:
+                return jsonify({"error": f"Missing field: {field}"}), 400
+
+        # Build quote payload with Mapecomm as supplier (always us) and customer as buyer
+        quote_data = {
+            "quote_number": data["quote_number"],
+            "issue_date": data["issue_date"],
+            "valid_until": data.get("valid_until", ""),
+            "currency": data.get("currency", "CZK"),
+            "description": data.get("description", ""),
+            "notes": data.get("notes", ""),
+            "pricing_mode": data.get("pricing_mode", "per_item"),
+            "supplier": {
+                "name": "Mapecomm s.r.o.",
+                "ico": "10950672",
+                "dic": "CZ10950672",
+                "address": "U Stavoservisu 659/3",
+                "city_zip": "10800 Praha",
+                "country": "Česká republika",
+                "contact": "Jakub Matuska",
+                "email": "jakub@mapecomm.tech",
+                "phone": "+420 724 941 971",
+            },
+            "buyer": {
+                "name": data["buyer"].get("name", ""),
+                "ico": data["buyer"].get("ico", ""),
+                "dic": data["buyer"].get("dic", ""),
+                "address": data["buyer"].get("address", ""),
+                "city_zip": data["buyer"].get("city_zip", ""),
+                "country": data["buyer"].get("country", ""),
+                "contact": data["buyer"].get("contact", ""),
+                "email": data["buyer"].get("email", ""),
+                "phone": data["buyer"].get("phone", ""),
+            },
+            "items": [
+                {
+                    "name": it.get("name", ""),
+                    "description": it.get("description", ""),
+                    "quantity": float(it.get("quantity", 1)),
+                    "unit": it.get("unit", ""),
+                    "unit_price": float(it.get("unit_price", 0)),
+                    "line_total": float(it.get("line_total", 0)),
+                }
+                for it in data["items"]
+            ],
+            "total": float(data["total"]),
+        }
+
+        # Generate content PDF, then merge with letterhead (reusing PO module's merger)
+        content_buf = generate_quote_content(quote_data)
+        output_buf = io.BytesIO()
+        merge_with_letterhead(content_buf, LETTERHEAD_PATH, output_buf)
+        output_buf.seek(0)
+
+        # Sanitize customer name for filename
+        customer_slug = "".join(
+            c if c.isalnum() or c in (" ", "_", "-") else "_"
+            for c in quote_data["buyer"]["name"]
+        ).strip().replace(" ", "_")
+        filename = f"{quote_data['quote_number']}_{customer_slug}.pdf"
+
+        return send_file(
+            output_buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename,
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port)
