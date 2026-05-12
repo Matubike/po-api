@@ -44,6 +44,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from po_generator import generate_po_content, merge_with_letterhead
 from quote_generator import generate_quote_content
+from line_items_generator import generate_line_items_content
 
 app = Flask(__name__)
 CORS(app)
@@ -191,7 +192,88 @@ def generate_quote():
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-        
+
+# app.py — co přidat
+
+## ÚPRAVA 1: Import
+
+Pod existující řádek:
+```python
+from quote_generator import generate_quote_content
+```
+
+PŘIDEJ:
+```python
+from line_items_generator import generate_line_items_content
+```
+
+---
+
+## ÚPRAVA 2: Nový endpoint /generate-line-items
+
+PŘED tenhle blok na konci app.py:
+```python
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
+```
+
+PŘIDEJ tenhle endpoint:
+
+```python
+@app.route("/generate-line-items", methods=["POST"])
+def generate_line_items():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Validate required fields
+        required = ["site_id", "bestellung_nr", "customer_name", "generated_date", "items", "total"]
+        for field in required:
+            if field not in data:
+                return jsonify({"error": f"Missing field: {field}"}), 400
+
+        # Normalize payload
+        payload = {
+            "site_id": data["site_id"],
+            "bestellung_nr": data["bestellung_nr"],
+            "customer_name": data["customer_name"],
+            "generated_date": data["generated_date"],
+            "currency": data.get("currency", "EUR"),
+            "items": [
+                {
+                    "code": it.get("code", ""),
+                    "description": it.get("description", ""),
+                    "unit_price": float(it.get("unit_price", 0)),
+                    "quantity": float(it.get("quantity", 0)),
+                    "line_total": float(it.get("line_total", 0)),
+                }
+                for it in data["items"]
+            ],
+            "total": float(data["total"]),
+            "note_to_customer": data.get("note_to_customer", ""),
+        }
+
+        # Generate content PDF, then merge with letterhead (reuse PO module's merger)
+        content_buf = generate_line_items_content(payload)
+        output_buf = io.BytesIO()
+        merge_with_letterhead(content_buf, LETTERHEAD_PATH, output_buf)
+        output_buf.seek(0)
+
+        # Filename: LineItems_{site_id}_{date}.pdf
+        date_slug = data["generated_date"].replace(".", "-")
+        filename = f"LineItems_{data['site_id']}_{date_slug}.pdf"
+
+        return send_file(
+            output_buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename,
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port)
