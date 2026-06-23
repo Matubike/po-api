@@ -45,6 +45,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from po_generator import generate_po_content, merge_with_letterhead
 from quote_generator import generate_quote_content
 from line_items_generator import generate_line_items_content
+from project_order_generator import generate_project_order_content
 
 app = Flask(__name__)
 CORS(app)
@@ -193,7 +194,74 @@ def generate_quote():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/generate-project-order", methods=["POST"])
+def generate_project_order():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
 
+        required = ["po_number", "issue_date", "supplier", "items"]
+        for field in required:
+            if field not in data:
+                return jsonify({"error": f"Missing field: {field}"}), 400
+
+        po_data = {
+            "po_number": data["po_number"],
+            "issue_date": data["issue_date"],
+            "supplier": {
+                "name": data["supplier"].get("name", ""),
+                "ico": data["supplier"].get("ico", ""),
+                "dic": data["supplier"].get("dic", ""),
+                "address": data["supplier"].get("address", ""),
+                "city_zip": data["supplier"].get("city_zip", ""),
+                "country": data["supplier"].get("country", "Česká republika"),
+                "email": data["supplier"].get("email", ""),
+                "phone": data["supplier"].get("phone", ""),
+            },
+            "buyer": {
+                "name": "Mapecomm s.r.o.",
+                "ico": "10950672",
+                "dic": "CZ10950672",
+                "address": "U Stavoservisu 659/3",
+                "city_zip": "10800 Praha",
+                "country": "Česká republika",
+                "contact": "Jakub Matuska",
+                "email": "jakub@mapecomm.tech",
+                "phone": "+420724941971",
+            },
+            "items": [
+                {
+                    "project": it.get("project", ""),
+                    "location": it.get("location", ""),
+                    "end_date": it.get("end_date", ""),
+                    "price": it.get("price", ""),
+                }
+                for it in data["items"]
+            ],
+        }
+
+        content_buf = generate_project_order_content(po_data)
+        output_buf = io.BytesIO()
+        merge_with_letterhead(content_buf, LETTERHEAD_PATH, output_buf)
+        output_buf.seek(0)
+
+        supplier_slug = "".join(
+            c if c.isalnum() or c in (" ", "_", "-") else "_"
+            for c in po_data["supplier"]["name"]
+        ).strip().replace(" ", "_")
+        filename = f"{po_data['po_number']}_{supplier_slug}_Projekt.pdf"
+
+        return send_file(
+            output_buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename,
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
 @app.route("/generate-line-items", methods=["POST"])
 def generate_line_items():
     try:
